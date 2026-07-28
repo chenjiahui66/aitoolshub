@@ -53,7 +53,7 @@ export default defineConfig({
     }),
     stripElementPlusCssInSsr(),
   ],
-  base:'/aitoolshub/'
+  base:'/aitoolshub/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
