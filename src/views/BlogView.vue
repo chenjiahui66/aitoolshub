@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useSeo } from '@/composables/useSeo'
-import { posts } from '@/data/posts'
+import { ElMessage } from 'element-plus'
+import { listArticles } from '@/api/article'
 import BlogCard from '@/components/BlogCard.vue'
 
 useSeo({
@@ -17,35 +18,88 @@ useSeo({
     '@type': 'Blog',
     name: 'AIToolsHub 博客',
     description: 'AI 行业的深度教程与趋势分析。',
-    blogPost: posts.map((p) => ({
-      '@type': 'BlogPosting',
-      headline: p.title,
-      description: p.excerpt,
-      datePublished: p.date,
-      author: { '@type': 'Person', name: p.author },
-    })),
+    blogPost: [],
   },
 })
 
-const allCategories = computed(() => {
-  const set = new Set(posts.map((p) => p.category))
-  return ['全部', ...set]
-})
+interface Post {
+  id: string
+  title: string
+  excerpt: string
+  category: string
+  author: string
+  date: string
+  readTime: string
+  cover: string
+  content: string
+  tags: string[]
+}
+
+/** 把后端实体映射成前端 Post。后端暂时没存的字段用兜底值。 */
+function toPost(a: BackendArticle): Post {
+  const plain = (a.content || '').replace(/\s+/g, ' ').trim()
+  const excerpt = plain.length > 80 ? plain.slice(0, 80) + '…' : plain
+  const date = (a.publishedAt || a.createdAt || '').slice(0, 10)
+  return {
+    id: String(a.id),
+    title: a.title,
+    excerpt: excerpt || '（暂无摘要）',
+    category: 'AI 文章',
+    author: a.author || 'AIToolsHub 编辑部',
+    date,
+    readTime: `${Math.max(1, Math.round((a.content?.length || 0) / 400))} 分钟`,
+    cover:
+      a.coverImage ||
+      'linear-gradient(135deg,#0ea5e9 0%,#8b5cf6 100%)',
+    content: a.content,
+    tags: [],
+  }
+}
+
+// 远程数据
+const remotePosts = ref<Post[]>([])
+const total = ref(0)
+const page = ref(1)
+const size = ref(6) // 1 张精选 + 5 张卡片，桌面端 3 列 -> 第二页基本是 6/3=2 行
+const loading = ref(false)
+
+async function fetchList(p = page.value) {
+  loading.value = true
+  try {
+    const data = await listArticles({ page: p, size: size.value })
+    remotePosts.value = data.items.map(toPost)
+    total.value = data.total
+    page.value = data.page
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '加载失败'
+    ElMessage.error('文章加载失败：' + msg)
+    remotePosts.value = []
+    total.value = 0
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => fetchList(1))
+
+// 客户端筛选（不调接口，列表内过滤）
 const activeCategory = ref('全部')
 const searchQuery = ref('')
+const allCategories = computed(() => ['全部'])
 
 const filtered = computed(() => {
-  let list = posts
+  let list = remotePosts.value
   if (activeCategory.value !== '全部') {
-    list = list.filter((p) => p.category === activeCategory.value)
+    // 后端没存 category，分类按钮目前只占位
+    list = []
   }
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.trim().toLowerCase()
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
     list = list.filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
         p.excerpt.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q)),
+        p.content.toLowerCase().includes(q),
     )
   }
   return list
@@ -53,6 +107,10 @@ const filtered = computed(() => {
 
 const featured = computed(() => filtered.value[0])
 const restPosts = computed(() => filtered.value.slice(1))
+
+function onPageChange(p: number) {
+  fetchList(p)
+}
 </script>
 
 <template>
@@ -71,7 +129,7 @@ const restPosts = computed(() => filtered.value.slice(1))
         <div class="search-bar">
           <el-input
             v-model="searchQuery"
-            placeholder="搜索文章标题、内容、标签..."
+            placeholder="搜索文章标题、正文..."
             size="large"
             clearable
           >
@@ -97,10 +155,21 @@ const restPosts = computed(() => filtered.value.slice(1))
 
     <section class="section">
       <div class="container">
-        <template v-if="filtered.length">
+        <el-skeleton v-if="loading" :rows="6" animated />
+        <template v-else-if="filtered.length">
           <BlogCard v-if="featured" :post="featured" featured />
           <div class="blog-grid">
             <BlogCard v-for="p in restPosts" :key="p.id" :post="p" />
+          </div>
+          <div class="pagination">
+            <el-pagination
+              background
+              layout="prev, pager, next, total"
+              :total="total"
+              :page-size="size"
+              :current-page="page"
+              @current-change="onPageChange"
+            />
           </div>
         </template>
         <el-empty v-else description="没有找到匹配的文章，试试其他关键词" />
@@ -177,6 +246,11 @@ const restPosts = computed(() => filtered.value.slice(1))
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
   }
+}
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
 }
 .subscribe {
   display: flex;

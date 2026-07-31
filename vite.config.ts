@@ -62,6 +62,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    // 把 /api 前缀的请求转发到 Spring Boot，避免前端写死后端 host/端口
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     target: 'es2018',
