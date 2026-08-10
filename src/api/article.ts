@@ -37,5 +37,15 @@ export function listArticles(params: ListArticlesParams = {}) {
   if (params.keyword) qs.set('keyword', params.keyword)
   qs.set('page', String(params.page ?? 1))
   qs.set('size', String(params.size ?? 10))
-  return http.get<BackendPage<BackendArticle>>(`/articles?${qs.toString()}`)
+  return http.get<BackendPage<BackendArticle>>(`/web/articles?${qs.toString()}`)
+}
+
+/** 文章详情(按 slug) */
+export function getArticleBySlug(slug: string) {
+  return http.get<BackendArticle>(`/web/articles/by-slug/${encodeURIComponent(slug)}`)
+}
+
+/** 最新文章(首页展示) */
+export function latestArticles(limit = 6) {
+  return http.get<BackendArticle[]>(`/web/articles/latest?limit=${limit}`)
 }

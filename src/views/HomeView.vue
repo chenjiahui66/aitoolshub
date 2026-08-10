@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useSeo, siteConfig } from '@/composables/useSeo'
-import { tools } from '@/data/tools'
-import { posts } from '@/data/posts'
 import ToolCard from '@/components/ToolCard.vue'
 import BlogCard from '@/components/BlogCard.vue'
+import type { Tool } from '@/data/tools'
+import type { Post } from '@/data/posts'
+import { listTools, splitTags, type BackendTool } from '@/api/tool'
+import { latestArticles, type BackendArticle } from '@/api/article'
 
 const router = useRouter()
 
@@ -30,8 +34,58 @@ useSeo({
   },
 })
 
-const hotTools = tools.filter((t) => t.hot).slice(0, 6)
-const latestPosts = posts.slice(0, 3)
+// 把后端 Tool 映射成前端 ToolCard 接受的形状
+function toFrontend(t: BackendTool): Tool {
+  return {
+    id: String(t.id),
+    name: t.name,
+    category: t.category || '未分类',
+    desc: t.description || '',
+    url: t.url,
+    tags: splitTags(t.tags),
+    hot: !!t.featured,
+    free: false,
+    logoColor: '#6366f1',
+    initial: (t.name || '?').charAt(0).toUpperCase(),
+  }
+}
+
+// 把后端 Article 映射成前端 BlogCard 接受的形状(参考 BlogView 的 toPost)
+function toPost(a: BackendArticle): Post {
+  const plain = (a.content || '').replace(/\s+/g, ' ').trim()
+  const excerpt = plain.length > 80 ? plain.slice(0, 80) + '…' : plain
+  const date = (a.publishedAt || a.createdAt || '').slice(0, 10)
+  return {
+    id: String(a.id),
+    title: a.title,
+    excerpt: excerpt || '（暂无摘要）',
+    category: a.category || 'AI 文章',
+    author: a.author || 'AIToolsHub 编辑部',
+    date,
+    readTime: `${Math.max(1, Math.round((a.content?.length || 0) / 400))} 分钟`,
+    cover: a.coverImage || 'linear-gradient(135deg,#0ea5e9 0%,#8b5cf6 100%)',
+    content: a.content,
+    tags: [],
+  }
+}
+
+const hotTools = ref<Tool[]>([])
+const latestPosts = ref<Post[]>([])
+
+async function load() {
+  try {
+    const [toolsResp, postsResp] = await Promise.all([
+      listTools(),
+      latestArticles(3),
+    ])
+    hotTools.value = (toolsResp.items || []).filter((t) => t.featured).slice(0, 6).map(toFrontend)
+    latestPosts.value = (postsResp || []).map(toPost)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '加载失败'
+    ElMessage.error('首页数据加载失败：' + msg)
+  }
+}
+onMounted(load)
 
 const features = [
   {

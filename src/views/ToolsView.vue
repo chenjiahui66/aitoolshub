@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useSeo } from '@/composables/useSeo'
-import { tools, categories, type Tool } from '@/data/tools'
 import ToolCard from '@/components/ToolCard.vue'
+import type { Tool } from '@/data/tools'
+import { listTools, splitTags, type BackendTool } from '@/api/tool'
 
 const router = useRouter()
 
@@ -22,24 +24,56 @@ useSeo({
     description: '收录数百款热门 AI 工具的导航页。',
     mainEntity: {
       '@type': 'ItemList',
-      numberOfItems: tools.length,
-      itemListElement: tools.slice(0, 10).map((t, i) => ({
-        '@type': 'ListItem',
-        position: i + 1,
-        name: t.name,
-        url: t.url,
-        description: t.desc,
-      })),
+      numberOfItems: 0,
+      itemListElement: [],
     },
   },
 })
+
+// 把后端 Tool 映射成前端 ToolCard 接受的形状(logoColor/initial 等用默认值补齐)
+function toFrontend(t: BackendTool): Tool {
+  return {
+    id: String(t.id),
+    name: t.name,
+    category: t.category || '未分类',
+    desc: t.description || '',
+    url: t.url,
+    tags: splitTags(t.tags),
+    hot: !!t.featured,
+    free: false,
+    logoColor: '#6366f1',
+    initial: (t.name || '?').charAt(0).toUpperCase(),
+  }
+}
+
+const allTools = ref<Tool[]>([])
+const categoryList = ref<string[]>(['全部'])
+const loading = ref(false)
+
+async function load() {
+  loading.value = true
+  try {
+    const data = await listTools()
+    allTools.value = (data.items || []).map(toFrontend)
+    const cats = (data.categories || []).filter(Boolean)
+    categoryList.value = ['全部', ...cats]
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '加载失败'
+    ElMessage.error('工具列表加载失败：' + msg)
+    allTools.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(load)
 
 const activeCategory = ref<string>('全部')
 const searchQuery = ref('')
 const sortBy = ref<'hot' | 'name'>('hot')
 
 const filtered = computed(() => {
-  let list: Tool[] = tools
+  let list: Tool[] = allTools.value
   if (activeCategory.value !== '全部') {
     list = list.filter((t) => t.category === activeCategory.value)
   }
@@ -60,7 +94,6 @@ const filtered = computed(() => {
   return list
 })
 
-const categoryList = ['全部', ...categories.map((c) => c.name)]
 const totalCount = computed(() => filtered.value.length)
 </script>
 
@@ -117,7 +150,8 @@ const totalCount = computed(() => filtered.value.length)
       </div>
 
       <!-- 列表 -->
-      <div v-if="filtered.length" class="tool-grid">
+      <el-skeleton v-if="loading" :rows="6" animated />
+      <div v-else-if="filtered.length" class="tool-grid">
         <ToolCard v-for="t in filtered" :key="t.id" :tool="t" />
       </div>
       <el-empty v-else description="没有找到匹配的工具，试试其他关键词或类目" />

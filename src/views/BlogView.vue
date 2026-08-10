@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useSeo } from '@/composables/useSeo'
 import { ElMessage } from 'element-plus'
-import { listArticles } from '@/api/article'
+import { listArticles, type BackendArticle } from '@/api/article'
 import BlogCard from '@/components/BlogCard.vue'
 
 useSeo({

@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSeo } from '@/composables/useSeo'
-import { apps } from '@/data/apps'
+import { listApps, type BackendApp } from '@/api/app'
 
 useSeo({
   title: 'AI 小工具 - 即开即用的在线工具集合',
@@ -137,6 +137,17 @@ const showError = (msg: string) => {
   }
 }
 
+// 从后端拉取小工具列表(只展示 online)
+const remoteApps = ref<BackendApp[]>([])
+async function loadApps() {
+  try {
+    remoteApps.value = await listApps()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '加载失败'
+    ElMessage.error('小工具列表加载失败：' + msg)
+  }
+}
+
 onMounted(() => {
   // 客户端首次挂载时初始化（避免 SSR 阶段触发 ElMessage 的 document 访问）
   tsInput.value = Date.now().toString()
@@ -147,6 +158,7 @@ onMounted(() => {
   formatJson()
   renderMd()
   generatePwd()
+  loadApps()
 })
 </script>
 
@@ -169,13 +181,14 @@ onMounted(() => {
       <div class="container">
         <h2 class="section-title">所有工具</h2>
         <p class="section-subtitle">点击下方任一工具卡片即可使用</p>
-        <div class="app-grid">
-          <a v-for="a in apps" :key="a.id" :href="`#${a.id}`" class="app-card">
-            <div class="emoji">{{ a.emoji }}</div>
+        <el-empty v-if="!remoteApps.length" description="暂无小工具" />
+        <div v-else class="app-grid">
+          <a v-for="a in remoteApps" :key="a.id" :href="`#${a.id}`" class="app-card">
+            <div class="emoji">{{ a.icon || '🛠️' }}</div>
             <div class="body">
               <h3>{{ a.name }}</h3>
-              <p>{{ a.desc }}</p>
-              <el-tag size="small" effect="plain">{{ a.tag }}</el-tag>
+              <p>{{ a.description }}</p>
+              <el-tag size="small" effect="plain">{{ a.category || '通用' }}</el-tag>
             </div>
           </a>
         </div>
