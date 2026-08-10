@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useSeo } from '@/composables/useSeo'
 import ToolCard from '@/components/ToolCard.vue'
-import type { Tool } from '@/data/tools'
+import type { Tool } from '@/types'
 import { listTools, splitTags, type BackendTool } from '@/api/tool'
 
 const router = useRouter()
@@ -83,7 +83,7 @@ const filtered = computed(() => {
       (t) =>
         t.name.toLowerCase().includes(q) ||
         t.desc.toLowerCase().includes(q) ||
-        t.tags.some((tag) => tag.toLowerCase().includes(q)),
+        t.tags.some((tag: string) => tag.toLowerCase().includes(q)),
     )
   }
   if (sortBy.value === 'hot') {

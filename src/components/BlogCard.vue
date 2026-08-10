@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Post } from '@/data/posts'
+import type { Post } from '@/types'
 
 defineProps<{ post: Post; featured?: boolean }>()
 </script>

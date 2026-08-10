@@ -5,8 +5,7 @@ import { ElMessage } from 'element-plus'
 import { useSeo, siteConfig } from '@/composables/useSeo'
 import ToolCard from '@/components/ToolCard.vue'
 import BlogCard from '@/components/BlogCard.vue'
-import type { Tool } from '@/data/tools'
-import type { Post } from '@/data/posts'
+import type { Tool, Post } from '@/types'
 import { listTools, splitTags, type BackendTool } from '@/api/tool'
 import { latestArticles, type BackendArticle } from '@/api/article'
 
@@ -59,7 +58,7 @@ function toPost(a: BackendArticle): Post {
     id: String(a.id),
     title: a.title,
     excerpt: excerpt || '（暂无摘要）',
-    category: a.category || 'AI 文章',
+    category: 'AI 文章',
     author: a.author || 'AIToolsHub 编辑部',
     date,
     readTime: `${Math.max(1, Math.round((a.content?.length || 0) / 400))} 分钟`,
